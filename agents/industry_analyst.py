@@ -1,7 +1,8 @@
 class IndustryAnalyst:
-    def __init__(self):
-        # TODO: 初始化Composio工具，如Tavily Search, Web Scraper
-        pass
+    def __init__(self, composio_api_key: str):
+        self.composio_api_key = composio_api_key
+        # TODO: 使用composio_api_key初始化Composio工具
+        print("行业分析师已初始化。")
 
     def run(self, job: str) -> dict:
         """

@@ -1,5 +1,10 @@
 import streamlit as st
 from agents import ProjectCoordinator
+from dotenv import load_dotenv
+import os
+
+# 在应用启动时加载环境变量
+load_dotenv()
 
 def main():
     st.set_page_config(page_title="智岗匹配分析平台", page_icon="🤖")
@@ -22,7 +27,20 @@ def main():
 
     if st.button("开始分析"):
         with st.spinner("分析任务已启动，智能体团队正在工作中...请稍候..."):
-            coordinator = ProjectCoordinator()
+            # 从环境变量中获取API密钥
+            openai_api_key = os.getenv("OPENAI_API_KEY")
+            composio_api_key = os.getenv("COMPOSIO_API_KEY")
+
+            # 检查API密钥是否存在
+            if not openai_api_key or not composio_api_key:
+                st.error("请在.env文件中设置OPENAI_API_KEY和COMPOSIO_API_KEY")
+                st.stop()
+            
+            # 将密钥传递给协调官
+            coordinator = ProjectCoordinator(
+                openai_api_key=openai_api_key,
+                composio_api_key=composio_api_key
+            )
             result = coordinator.run(major=major, job=job)
             st.success("分析完成！")
             st.markdown("---")

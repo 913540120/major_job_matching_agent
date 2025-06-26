@@ -5,10 +5,14 @@ from .report_generator import ReportGenerator
 
 
 class ProjectCoordinator:
-    def __init__(self):
-        self.education_analyst = EducationAnalyst()
-        self.industry_analyst = IndustryAnalyst()
-        self.data_analyst = DataInsightAnalyst()
+    def __init__(self, openai_api_key: str, composio_api_key: str):
+        self.openai_api_key = openai_api_key
+        self.composio_api_key = composio_api_key
+        
+        # 将配置传递给其他智能体
+        self.education_analyst = EducationAnalyst(composio_api_key=self.composio_api_key)
+        self.industry_analyst = IndustryAnalyst(composio_api_key=self.composio_api_key)
+        self.data_analyst = DataInsightAnalyst() # 数据分析师可能暂时不需要外部API
         self.report_generator = ReportGenerator()
 
     def run(self, major: str, job: str) -> str:

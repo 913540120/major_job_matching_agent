@@ -1,7 +1,8 @@
 class EducationAnalyst:
-    def __init__(self):
-        # TODO: 初始化Composio工具，如Web Scraper, Google Search
-        pass
+    def __init__(self, composio_api_key: str):
+        self.composio_api_key = composio_api_key
+        # TODO: 使用composio_api_key初始化Composio工具
+        print("教育分析师已初始化。")
 
     def run(self, major: str) -> dict:
         """
