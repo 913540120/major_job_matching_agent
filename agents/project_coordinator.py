@@ -10,7 +10,10 @@ class ProjectCoordinator:
         self.composio_api_key = composio_api_key
         
         # 将配置传递给其他智能体
-        self.education_analyst = EducationAnalyst(composio_api_key=self.composio_api_key)
+        self.education_analyst = EducationAnalyst(
+            openai_api_key=self.openai_api_key,
+            composio_api_key=self.composio_api_key
+        )
         self.industry_analyst = IndustryAnalyst(
             openai_api_key=self.openai_api_key,
             composio_api_key=self.composio_api_key
