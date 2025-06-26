@@ -9,30 +9,42 @@ class ReportGenerator:
         将最终的分析结果整合成一份专业的报告
         """
         print("正在生成最终分析报告...")
-        
-        education_data = analysis_result.get('education_data', {})
-        industry_data = analysis_result.get('industry_data', {})
 
-        # 临时生成一份格式化的Markdown字符串作为报告
+        if "error" in analysis_result:
+            return f"""
+            # 分析失败
+            报告生成失败，原因如下：
+            - **错误**: {analysis_result.get('error')}
+            - **详情**: {analysis_result.get('details')}
+            """
+
         final_report = f"""
-        # 专业-岗位匹配度初步分析报告
+        # 专业-岗位匹配度分析报告
 
         ## 核心摘要
         {analysis_result.get('summary', '无摘要')}
 
         ---
 
-        ## 教育侧分析 (占位符数据)
-        ```json
-        {json.dumps(education_data, indent=2, ensure_ascii=False)}
-        ```
+        ## 量化分析
+        - **匹配度得分**: **{analysis_result.get('match_score_percent', 0)}%**
+        - **核心重合技能**: 
+          - {', '.join(analysis_result.get('common_skills', ['无']))}
+        - **主要技能差距 (岗位要求但专业未覆盖)**: 
+          - {', '.join(analysis_result.get('skill_gaps', ['无']))}
 
         ---
 
-        ## 行业侧分析 (来自Tavily的真实数据)
-        ```json
-        {json.dumps(industry_data, indent=2, ensure_ascii=False)}
-        ```
+        ## 详情分析
+
+        ### 教育侧重点
+        根据分析，该专业的核心课程可能包括：
+        - {', '.join(analysis_result.get('education_highlights', ['信息待补充']))}
+
+        ### 行业侧重点
+        根据网络数据分析，该岗位的主要职责包括：
+        - {'\n- '.join(analysis_result.get('industry_highlights', ['信息待补充']))}
+        
         """
         
         print("最终报告生成完毕。")

@@ -11,7 +11,10 @@ class ProjectCoordinator:
         
         # 将配置传递给其他智能体
         self.education_analyst = EducationAnalyst(composio_api_key=self.composio_api_key)
-        self.industry_analyst = IndustryAnalyst(composio_api_key=self.composio_api_key)
+        self.industry_analyst = IndustryAnalyst(
+            openai_api_key=self.openai_api_key,
+            composio_api_key=self.composio_api_key
+        )
         self.data_analyst = DataInsightAnalyst() # 数据分析师可能暂时不需要外部API
         self.report_generator = ReportGenerator()
 
