@@ -18,6 +18,9 @@ class ReportGenerator:
             - **详情**: {analysis_result.get('details')}
             """
 
+        industry_highlights_list = analysis_result.get('industry_highlights', ['信息待补充'])
+        industry_highlights_str = '\n- '.join(industry_highlights_list)
+
         final_report = f"""
         # 专业-岗位匹配度分析报告
 
@@ -43,7 +46,7 @@ class ReportGenerator:
 
         ### 行业侧重点
         根据网络数据分析，该岗位的主要职责包括：
-        - {'\n- '.join(analysis_result.get('industry_highlights', ['信息待补充']))}
+        - {industry_highlights_str}
         
         """
         
