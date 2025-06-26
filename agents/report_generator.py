@@ -2,32 +2,36 @@ import json
 
 class ReportGenerator:
     def __init__(self):
-        # TODO: 初始化Composio工具，如Google Docs API, Matplotlib
-        pass
+        print("报告生成官已初始化。")
 
     def run(self, analysis_result: dict) -> str:
         """
         将最终的分析结果整合成一份专业的报告
         """
         print("正在生成最终分析报告...")
-
-        # TODO: 使用工具生成更专业的报告格式，如PDF或Google Doc
         
-        # 临时生成一份格式化的JSON字符串作为报告
+        education_data = analysis_result.get('education_data', {})
+        industry_data = analysis_result.get('industry_data', {})
+
+        # 临时生成一份格式化的Markdown字符串作为报告
         final_report = f"""
-        # 专业-岗位匹配度分析报告
+        # 专业-岗位匹配度初步分析报告
 
         ## 核心摘要
         {analysis_result.get('summary', '无摘要')}
 
-        ## 量化分析
-        - **匹配度得分**: {analysis_result.get('match_score_percent', 0)}%
-        - **核心重合技能**: {', '.join(analysis_result.get('common_skills', []))}
-        - **主要技能差距**: {', '.join(analysis_result.get('skill_gaps', []))}
+        ---
 
-        ## 原始数据
+        ## 教育侧分析 (占位符数据)
         ```json
-        {json.dumps(analysis_result, indent=2, ensure_ascii=False)}
+        {json.dumps(education_data, indent=2, ensure_ascii=False)}
+        ```
+
+        ---
+
+        ## 行业侧分析 (来自Tavily的真实数据)
+        ```json
+        {json.dumps(industry_data, indent=2, ensure_ascii=False)}
         ```
         """
         

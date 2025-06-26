@@ -2,4 +2,5 @@ agno
 composio-core
 streamlit
 openai
-python-dotenv 
+python-dotenv
+tavily-python 
