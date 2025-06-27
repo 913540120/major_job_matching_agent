@@ -30,11 +30,13 @@ class ReportGenerator:
         ---
 
         ## 量化分析
-        - **匹配度得分**: **{analysis_result.get('match_score_percent', 0)}%**
-        - **核心重合技能**: 
-          - {', '.join(analysis_result.get('common_skills', ['无']))}
-        - **主要技能差距 (岗位要求但专业未覆盖)**: 
-          - {', '.join(analysis_result.get('skill_gaps', ['无']))}
+        - **语义匹配度得分**: **{analysis_result.get('match_score_percent', 0)}%**
+        
+        ### 语义匹配技能
+        {self.format_matched_skills(analysis_result.get('common_skills_semantic', []))}
+
+        ### 主要技能差距 (岗位要求但专业未覆盖)
+        - {', '.join(analysis_result.get('skill_gaps', ['无']))}
 
         ---
 
@@ -52,3 +54,12 @@ class ReportGenerator:
         
         print("最终报告生成完毕。")
         return final_report.strip()
+
+    def format_matched_skills(self, matched_skills: list) -> str:
+        if not matched_skills:
+            return "- 无"
+        
+        lines = []
+        for match in matched_skills:
+            lines.append(f"- **{match['industry_skill']}** (岗位) <=> **{match['education_skill']}** (专业)")
+        return "\n".join(lines)

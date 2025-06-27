@@ -18,7 +18,7 @@ class ProjectCoordinator:
             openai_api_key=self.openai_api_key,
             composio_api_key=self.composio_api_key
         )
-        self.data_analyst = DataInsightAnalyst() # 数据分析师可能暂时不需要外部API
+        self.data_analyst = DataInsightAnalyst(openai_api_key=self.openai_api_key)
         self.report_generator = ReportGenerator()
 
     def run(self, major: str, job: str) -> str:

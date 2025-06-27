@@ -16,7 +16,7 @@ class IndustryAnalyst:
         # 初始化OpenAI客户端
         if not openai_api_key:
             raise ValueError("OPENAI_API_KEY not found in environment variables.")
-        self.openai_client = OpenAI(api_key=openai_api_key)
+        self.openai_client = OpenAI(base_url='https://api.siliconflow.cn/v1',api_key=openai_api_key)
         
         print("行业分析师已初始化，并配备Tavily搜索和OpenAI分析工具。")
 
@@ -57,7 +57,7 @@ class IndustryAnalyst:
             """
             
             response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
+                model="deepseek-ai/DeepSeek-R1",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": f"Here is the context about the job '{job}':\n\n{context}"}
