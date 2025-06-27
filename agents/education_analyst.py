@@ -38,8 +38,10 @@ class EducationAnalyst:
             print("--> 正在连接OpenAI API进行信息提取...")
             system_prompt = """
             You are an expert academic advisor. Your task is to extract structured information 
-            about a university major from the provided text.
-            Please extract the core courses and the key required skills for this major.
+            about a university major from the provided text. From the context, please extract:
+            1. A list of core course names or course codes.
+            2. A list of key skills, which are the abilities, technologies, or tools a student is expected to learn (e.g., "programming in Python", "algorithm design", "database management", "machine learning").
+
             Respond ONLY with a valid JSON object in the following format:
             {
                 "core_courses": ["course1", "course2", ...],
