@@ -58,7 +58,14 @@ class DataInsightAnalyst:
                 response_format={"type": "json_object"}
             )
             
-            analysis = json.loads(response.choices[0].message.content)
+            analysis_raw = json.loads(response.choices[0].message.content)
+            
+            # 增加弹性，处理模型可能返回列表的情况
+            if isinstance(analysis_raw, list) and len(analysis_raw) > 0:
+                analysis = analysis_raw[0]
+            else:
+                analysis = analysis_raw
+
             print("--> 语义分析完成。")
 
             match_count = len(analysis.get("matched_skills", []))
