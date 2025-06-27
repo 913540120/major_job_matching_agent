@@ -1,4 +1,5 @@
 import json
+import textwrap
 
 class ReportGenerator:
     def __init__(self):
@@ -21,7 +22,7 @@ class ReportGenerator:
         industry_highlights_list = analysis_result.get('industry_highlights', ['信息待补充'])
         industry_highlights_str = '\n- '.join(industry_highlights_list)
 
-        final_report = f"""
+        final_report_str = f"""
         # 专业-岗位匹配度分析报告
 
         ## 核心摘要
@@ -52,6 +53,7 @@ class ReportGenerator:
         
         """
         
+        final_report = textwrap.dedent(final_report_str)
         print("最终报告生成完毕。")
         return final_report.strip()
 
