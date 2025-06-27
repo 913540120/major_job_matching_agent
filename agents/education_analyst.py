@@ -25,22 +25,29 @@ class EducationAnalyst:
         使用Tavily搜索并使用LLM提取结构化数据来分析指定专业
         """
         print(f"正在使用Tavily分析专业：{major}...")
-        query = f"curriculum, core courses, and required skills for a bachelor's degree in '{major}'"
+        
+        # 升级的搜索查询
+        query1 = f"core curriculum and course descriptions for a '{major}' undergraduate degree"
+        query2 = f"key skills and technologies learned by a '{major}' graduate"
         
         try:
-            # 步骤 1: Tavily 搜索
-            print("--> 正在连接Tavily API...")
-            search_results = self.tavily_client.search(query=query, search_depth="advanced", max_results=5)
-            context = "\n\n".join([result['content'] for result in search_results['results']])
-            print("--> Tavily搜索完成。")
+            # 步骤 1: Tavily 搜索 (合并两次搜索结果)
+            print("--> 正在连接Tavily API进行深度搜索...")
+            search_results1 = self.tavily_client.search(query=query1, search_depth="advanced", max_results=3)
+            search_results2 = self.tavily_client.search(query=query2, search_depth="advanced", max_results=3)
+            
+            context = "\n\n---Course Information---\n" + "\n\n".join([r['content'] for r in search_results1['results']])
+            context += "\n\n---Skills Information---\n" + "\n\n".join([r['content'] for r in search_results2['results']])
+            print("--> Tavily深度搜索完成。")
 
-            # 步骤 2: OpenAI 提取
+            # 步骤 2: OpenAI 提取 (使用更强大的Prompt)
             print("--> 正在连接OpenAI API进行信息提取...")
             system_prompt = """
-            You are an expert academic advisor. Your task is to extract structured information 
-            about a university major from the provided text. From the context, please extract:
-            1. A list of core course names or course codes.
-            2. A list of key skills, which are the abilities, technologies, or tools a student is expected to learn (e.g., "programming in Python", "algorithm design", "database management", "machine learning").
+            You are an expert academic advisor. Your task is to extract structured information about a university major from the provided text, which is a mix of course descriptions and skill discussions.
+            
+            From the context, please perform the following:
+            1.  Extract a list of core course names.
+            2.  **Infer and list the key skills**. Skills are abilities, technologies, or tools a student is expected to learn. You should infer them from both the course descriptions and explicit skill mentions (e.g., a "Data Structures" course implies "algorithm design" as a skill).
 
             Respond ONLY with a valid JSON object in the following format:
             {
