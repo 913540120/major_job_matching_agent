@@ -39,7 +39,13 @@ class ReportGenerator:
             report_lines.append("- _无核心技能匹配_")
         else:
             for match in core_matches:
-                report_lines.append(f"- **{match.get('industry_skill', 'N/A')}** (岗位) <=> **{match.get('education_skill', 'N/A')}** (专业)")
+                # 处理字符串格式或字典格式
+                if isinstance(match, str):
+                    report_lines.append(f"- **{match}**")
+                elif isinstance(match, dict):
+                    report_lines.append(f"- **{match.get('industry_skill', 'N/A')}** (岗位) <=> **{match.get('education_skill', 'N/A')}** (专业)")
+                else:
+                    report_lines.append(f"- **{str(match)}**")
         
         report_lines.append("") # 添加空行
 
@@ -50,7 +56,13 @@ class ReportGenerator:
             report_lines.append("- _无相关技能匹配_")
         else:
             for match in related_matches:
-                report_lines.append(f"- {match.get('industry_skill', 'N/A')} (岗位) <=> {match.get('education_skill', 'N/A')} (专业)")
+                # 处理字符串格式或字典格式
+                if isinstance(match, str):
+                    report_lines.append(f"- {match}")
+                elif isinstance(match, dict):
+                    report_lines.append(f"- {match.get('industry_skill', 'N/A')} (岗位) <=> {match.get('education_skill', 'N/A')} (专业)")
+                else:
+                    report_lines.append(f"- {str(match)}")
 
         report_lines.append("") # 添加空行
 
@@ -61,7 +73,11 @@ class ReportGenerator:
             report_lines.append("- _无明显技能差距_")
         else:
             for gap in skill_gaps:
-                report_lines.append(f"- **{gap}**")
+                # 处理字符串格式或字典格式
+                if isinstance(gap, str):
+                    report_lines.append(f"- **{gap}**")
+                else:
+                    report_lines.append(f"- **{str(gap)}**")
 
         report_lines.extend([
             "---",

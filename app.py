@@ -145,11 +145,25 @@ def display_skills_analysis(analysis: Dict[str, Any]):
             core_matches = semantic_data.get("core_matches", [])
             if core_matches:
                 for match in core_matches:
-                    st.markdown(f"""
-                    <div class="skill-match">
-                        ✅ <strong>{match.get('industry_skill', 'N/A')}</strong> ↔ {match.get('education_skill', 'N/A')}
-                    </div>
-                    """, unsafe_allow_html=True)
+                    # 处理字符串格式或字典格式
+                    if isinstance(match, str):
+                        st.markdown(f"""
+                        <div class="skill-match">
+                            ✅ <strong>{match}</strong>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    elif isinstance(match, dict):
+                        st.markdown(f"""
+                        <div class="skill-match">
+                            ✅ <strong>{match.get('industry_skill', 'N/A')}</strong> ↔ {match.get('education_skill', 'N/A')}
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                        <div class="skill-match">
+                            ✅ <strong>{str(match)}</strong>
+                        </div>
+                        """, unsafe_allow_html=True)
             else:
                 st.warning("暂无核心技能匹配")
             
@@ -158,23 +172,39 @@ def display_skills_analysis(analysis: Dict[str, Any]):
             related_matches = semantic_data.get("related_matches", [])
             if related_matches:
                 for match in related_matches:
-                    st.markdown(f"""
-                    <div class="skill-match">
-                        ✓ {match.get('industry_skill', 'N/A')} ↔ {match.get('education_skill', 'N/A')}
-                    </div>
-                    """, unsafe_allow_html=True)
+                    # 处理字符串格式或字典格式
+                    if isinstance(match, str):
+                        st.markdown(f"""
+                        <div class="skill-match">
+                            ✓ {match}
+                        </div>
+                        """, unsafe_allow_html=True)
+                    elif isinstance(match, dict):
+                        st.markdown(f"""
+                        <div class="skill-match">
+                            ✓ {match.get('industry_skill', 'N/A')} ↔ {match.get('education_skill', 'N/A')}
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                        <div class="skill-match">
+                            ✓ {str(match)}
+                        </div>
+                        """, unsafe_allow_html=True)
         
         # 技能差距
         if analysis.get("skill_gaps"):
             st.subheader("⚠️ 技能差距")
             for gap in analysis["skill_gaps"]:
+                gap_text = gap if isinstance(gap, str) else str(gap)
                 st.markdown(f"""
                 <div class="skill-gap">
-                    ❌ {gap}
+                    ❌ {gap_text}
                 </div>
                 """, unsafe_allow_html=True)
     except Exception as e:
         st.error(f"显示技能分析时出错: {str(e)}")
+        print(f"Error in display_skills_analysis: {e}")
 
 class StableAnalysisUI:
     def __init__(self):
@@ -261,6 +291,7 @@ class StableAnalysisUI:
                             st.error(f"分析失败: {analysis['error']}")
                             return
                             
+                        # 使用更好的布局展示更多信息
                         col1, col2 = st.columns(2)
                         with col1:
                             st.subheader("技能要求")
@@ -270,6 +301,11 @@ class StableAnalysisUI:
                                     st.write(f"• {skill}")
                             else:
                                 st.write("暂无技能要求信息")
+                            
+                            # 薪资信息
+                            if analysis.get("salary_range"):
+                                st.subheader("💰 薪资范围")
+                                st.write(analysis["salary_range"])
                         
                         with col2:
                             st.subheader("主要职责")
@@ -279,10 +315,19 @@ class StableAnalysisUI:
                                     st.write(f"• {resp}")
                             else:
                                 st.write("暂无职责信息")
-                            
-                            if analysis.get("salary_range"):
-                                st.subheader("薪资范围")
-                                st.write(analysis["salary_range"])
+                        
+                        # 新增：市场趋势和职业发展（全宽显示）
+                        if analysis.get("market_trends"):
+                            st.subheader("📈 市场趋势")
+                            trends = analysis["market_trends"]
+                            for trend in trends:
+                                st.write(f"🔸 {trend}")
+                        
+                        if analysis.get("career_growth"):
+                            st.subheader("🚀 职业发展路径")
+                            growth_paths = analysis["career_growth"]
+                            for path in growth_paths:
+                                st.write(f"🔸 {path}")
                 
                 elif agent_name == "批判分析师":
                     questions = analysis.get("questions_for_next_round", [])
@@ -373,7 +418,7 @@ def run_stable_analysis(coordinator, major: str, job_title: str, max_rounds: int
                 # 教育分析师分析
                 ui.display_status("📚 教育分析师正在分析专业信息...")
                 education_result, error = safe_execute_with_timeout(
-                    coordinator.education_analyst.run, 45, major
+                    coordinator.education_analyst.run, 90, major  # 增加到90秒
                 )
                 if error:
                     ui.display_status(f"教育分析失败: {error}", "error")
@@ -384,7 +429,7 @@ def run_stable_analysis(coordinator, major: str, job_title: str, max_rounds: int
                 # 行业分析师分析
                 ui.display_status("🏢 行业分析师正在分析岗位需求...")
                 industry_result, error = safe_execute_with_timeout(
-                    coordinator.industry_analyst.run, 45, job_title
+                    coordinator.industry_analyst.run, 90, job_title  # 增加到90秒
                 )
                 if error:
                     ui.display_status(f"行业分析失败: {error}", "error")
@@ -394,24 +439,38 @@ def run_stable_analysis(coordinator, major: str, job_title: str, max_rounds: int
             else:
                 # 后续轮次：深化分析
                 question_count = len(state['critique_and_questions'])
-                ui.display_status(f"📚 教育分析师正在基于 {question_count} 个问题进行深化研究...")
+                ui.display_status(f"📚 教育分析师和行业分析师正在基于 {question_count} 个问题进行深化研究...")
                 
                 # 限制问题数量，避免过度复杂化
                 limited_questions = state['critique_and_questions'][:3]  # 最多处理3个问题
                 
+                # 教育分析师深化分析
                 education_result, error = safe_execute_with_timeout(
-                    coordinator.education_analyst.run, 45, major, questions=limited_questions
+                    coordinator.education_analyst.run, 90, major, questions=limited_questions  # 增加到90秒
                 )
                 if error:
-                    ui.display_status(f"深化分析失败: {error}", "error")
+                    ui.display_status(f"教育分析失败: {error}", "error")
                     break
                 state["education_report"] = education_result
                 ui.display_agent_analysis("教育分析师", state["education_report"])
+                
+                # 行业分析师也进行深化分析
+                ui.display_status("🏢 行业分析师正在基于批判问题深化岗位分析...")
+                industry_result, error = safe_execute_with_timeout(
+                    coordinator.industry_analyst.run, 90, job_title, questions=limited_questions  # 增加到90秒
+                )
+                if error:
+                    ui.display_status(f"行业深化分析失败: {error}", "error")
+                    # 如果行业分析失败，继续使用之前的结果
+                    ui.display_status("使用之前的行业分析结果继续", "warning")
+                else:
+                    state["industry_report"] = industry_result
+                    ui.display_agent_analysis("行业分析师", state["industry_report"])
             
             # 批判分析
             ui.display_status("🤔 批判分析师正在进行质疑和审查...")
             critique_result, error = safe_execute_with_timeout(
-                coordinator.critic_analyst.run_critique, 30,
+                coordinator.critic_analyst.run_critique, 60,  # 增加到60秒
                 state["education_report"],
                 state["industry_report"]
             )
@@ -440,7 +499,7 @@ def run_stable_analysis(coordinator, major: str, job_title: str, max_rounds: int
         # 最终量化分析
         ui.display_status("📊 正在进行最终量化匹配分析...")
         final_analysis, error = safe_execute_with_timeout(
-            coordinator.critic_analyst.run, 30,
+            coordinator.critic_analyst.run, 90,  # 增加到90秒，因为涉及复杂的技能匹配分析
             state["education_report"], 
             state["industry_report"]
         )
@@ -532,7 +591,7 @@ def main():
         )
     
     # 开始分析按钮
-    start_button_disabled = (st.session_state.analysis_state == 'running')
+    start_button_disabled = (st.session_state.analysis_state in ['running', 'completed'])
     
     if st.button("🚀 开始深度分析", type="primary", use_container_width=True, disabled=start_button_disabled):
         if not OPENAI_API_KEY:
@@ -565,10 +624,16 @@ def main():
         if final_state:
             st.session_state.analysis_results = final_state
             st.session_state.analysis_state = 'completed'
-            st.rerun()  # 重新运行以显示结果
+            # 不再调用 st.rerun()，避免重复执行
+            st.success("✅ 分析完成！请查看下方结果。")
         else:
             st.session_state.analysis_state = 'error'
             st.error("❌ 分析失败，请检查网络连接或重试")
+    
+    # 显示实时分析状态
+    if st.session_state.analysis_state == 'running':
+        st.info("⏳ 分析正在进行中，请等待...")
+        st.markdown("*分析过程可能需要2-5分钟，请耐心等待系统处理。*")
     
     # 显示结果
     if st.session_state.analysis_state == 'completed' and st.session_state.analysis_results:
@@ -609,6 +674,15 @@ def main():
         if show_detailed_log:
             with st.expander("📝 查看详细讨论日志"):
                 st.json(final_state.get("discussion_log", []))
+        
+        # 重新分析按钮
+        if st.button("🔄 重新分析", type="secondary", use_container_width=True):
+            st.session_state.analysis_state = 'idle'
+            st.session_state.analysis_results = None
+            st.session_state.coordinator = None
+            st.session_state.current_round = 0
+            st.session_state.analysis_progress = []
+            st.rerun()
         
         st.success("✅ 分析任务完成！")
     
