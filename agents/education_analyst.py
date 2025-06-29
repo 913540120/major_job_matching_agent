@@ -21,13 +21,32 @@ class EducationAnalyst:
 
         print("教育分析师已初始化，并配备Tavily搜索和OpenAI分析工具。")
 
-    def run(self, major: str, questions: List[str] = None) -> dict:
+    def run(self, major: str, questions: List[str] = None, previous_report: dict = None) -> dict:
         """
         使用Tavily搜索并使用LLM提取结构化数据来分析指定专业
-        可以额外接收一个问题列表，以在分析中获得更具针对性的答案
-        """
-        print(f"正在使用Tavily分析专业：{major}...")
         
+        Args:
+            major: 专业名称
+            questions: 批判者问题列表，用于深化分析
+            previous_report: 之前的分析报告，用于优化模式
+        
+        Returns:
+            dict: 分析报告
+        """
+        print(f"正在分析专业：{major}...")
+        
+        # 判断是基础分析还是优化分析
+        is_optimization_mode = previous_report is not None and questions is not None
+        
+        if is_optimization_mode:
+            print(f"-> 优化模式：基于 {len(questions)} 个批判问题优化现有报告")
+            return self._optimize_existing_report(major, questions, previous_report)
+        else:
+            print(f"-> 基础模式：进行全新的专业分析")
+            return self._perform_basic_analysis(major, questions)
+    
+    def _perform_basic_analysis(self, major: str, questions: List[str] = None) -> dict:
+        """执行基础分析（原有逻辑）"""
         # 构建基础查询  
         base_query = f"{major} 专业课程 核心课程 技能培养"
         
@@ -185,3 +204,149 @@ class EducationAnalyst:
 
         print(f"专业 {major} 分析完成。")
         return report
+    
+    def _optimize_existing_report(self, major: str, questions: List[str], previous_report: dict) -> dict:
+        """基于批判问题优化现有报告"""
+        print("--> 执行报告优化模式...")
+        
+        # 构建针对性搜索查询
+        query_keywords = []
+        for q in questions[:3]:  # 最多处理前3个问题
+            if "课程" in q or "course" in q.lower():
+                query_keywords.append("课程设置")
+            if "技能" in q or "skill" in q.lower():
+                query_keywords.append("技能培养")
+            if "实践" in q or "practice" in q.lower():
+                query_keywords.append("实践教学")
+            if "项目" in q or "project" in q.lower():
+                query_keywords.append("项目经验")
+            if "深度" in q or "depth" in q.lower():
+                query_keywords.append("深度学习")
+            if "前沿" in q or "advanced" in q.lower():
+                query_keywords.append("前沿技术")
+        
+        # 构建补充查询
+        if query_keywords:
+            query = f"{major} 专业 " + " ".join(query_keywords[:3])
+        else:
+            query = f"{major} 专业 补充信息"
+        
+        # 限制查询长度
+        if len(query) > 350:
+            query = f"{major} 专业 深度补充"
+        
+        # 尝试获取补充信息
+        additional_context = ""
+        try:
+            print(f"--> 搜索补充信息: {query}")
+            tavily_response = self.tavily_client.search(
+                query=query,
+                search_depth="basic",  # 使用基础搜索节省资源
+                max_results=3
+            )
+            
+            for result in tavily_response['results']:
+                additional_context += f"补充信息: {result.get('content', '')}\n"
+            
+            print("--> 补充信息搜索完成")
+            
+        except Exception as e:
+            print(f"--> 补充信息搜索失败: {e}")
+            additional_context = "无法获取补充信息，基于现有报告进行优化。"
+        
+        # 构建优化提示词
+        system_prompt = """
+        You are an expert education analyst performing report optimization. Your task is to improve and enhance an existing educational analysis report based on specific critical questions.
+
+        You will receive:
+        1. An existing analysis report
+        2. Critical questions that need to be addressed
+        3. Additional context information (if available)
+
+        Your goal is to:
+        - **Enhance** the existing report by addressing the critical questions
+        - **Add** missing information that answers the questions
+        - **Refine** existing content to be more comprehensive
+        - **Maintain** the original structure and valuable information
+
+        Do NOT completely rewrite the report. Instead, OPTIMIZE it by:
+        - Adding new courses/skills that address the questions
+        - Removing outdated or irrelevant items
+        - Enhancing descriptions to be more specific and actionable
+        """
+
+        questions_str = "\n".join(f"- {q}" for q in questions)
+        system_prompt += f"""
+        
+        **Critical Questions to Address:**
+        {questions_str}
+        
+        Respond ONLY with a valid JSON object in this format:
+        {{
+            "core_courses": ["Enhanced Course List"],
+            "required_skills": ["Enhanced Skills List"]
+        }}
+        
+        CRITICAL: Ensure both fields are present and are arrays. Focus on ENHANCING, not replacing.
+        """
+        
+        # 构建用户输入
+        user_content = f"""
+        **Existing Report to Optimize:**
+        Major: {previous_report.get('major_name', major)}
+        Core Courses: {previous_report.get('core_courses', [])}
+        Required Skills: {previous_report.get('required_skills', [])}
+        
+        **Additional Context for Optimization:**
+        {additional_context}
+        
+        Please optimize this report by addressing the critical questions while maintaining the valuable existing information.
+        """
+        
+        print("--> 发送优化请求到DeepSeek AI...")
+        response = self.openai_client.chat.completions.create(
+            model="deepseek-ai/DeepSeek-R1",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
+            ],
+            response_format={"type": "json_object"}
+        )
+        
+        print("--> 正在解析优化结果...")
+        response_content = response.choices[0].message.content
+        print(f"--> 收到优化结果: {response_content[:200]}...")
+        
+        try:
+            optimized_data = json.loads(response_content)
+            
+            # 验证数据结构
+            if not isinstance(optimized_data, dict):
+                raise ValueError(f"期望字典格式，但收到: {type(optimized_data)}")
+            
+            # 确保字段存在并且是列表
+            for field in ["core_courses", "required_skills"]:
+                if field not in optimized_data or not isinstance(optimized_data[field], list):
+                    # 如果优化失败，使用原报告的数据
+                    optimized_data[field] = previous_report.get(field, [])
+            
+            print("--> 报告优化完成")
+            
+        except json.JSONDecodeError as e:
+            print(f"--> 优化结果解析失败: {e}")
+            # 如果解析失败，使用原报告
+            optimized_data = {
+                "core_courses": previous_report.get("core_courses", []),
+                "required_skills": previous_report.get("required_skills", [])
+            }
+        
+        # 构建优化后的报告
+        optimized_report = {
+            "major_name": major,
+            "analysis_source": "Optimized Report (Tavily + OpenAI)",
+            "optimization_questions": questions,
+            **optimized_data
+        }
+        
+        print(f"专业 {major} 报告优化完成")
+        return optimized_report

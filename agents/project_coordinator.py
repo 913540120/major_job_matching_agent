@@ -26,7 +26,9 @@ class DiscussionState(TypedDict):
     education_report: Dict[str, Any]
     industry_report: Dict[str, Any]
     data_insight_report: Dict[str, Any]
-    critique_and_questions: List[str]
+    critique_and_questions: List[str]  # 保持向后兼容
+    education_questions: List[str]  # 新增：专门针对教育的问题
+    industry_questions: List[str]   # 新增：专门针对行业的问题
     is_consensus_reached: bool
 
 
@@ -57,6 +59,8 @@ class ProjectCoordinator:
             "industry_report": {},
             "data_insight_report": {},
             "critique_and_questions": [],
+            "education_questions": [],
+            "industry_questions": [],
             "is_consensus_reached": False
         }
         self._log_discussion(state, "Coordinator", f"会议开始，议题: {state['topic']}")
@@ -68,18 +72,37 @@ class ProjectCoordinator:
             # 2. 开场陈述 (或根据上一轮问题进行深化分析)
             if round_num == 1:
                 # 第一轮，进行基础分析
+                print("第一轮：进行基础专业和岗位分析")
                 state["education_report"] = self.education_analyst.run(major)
                 state["industry_report"] = self.industry_analyst.run(job_title)
             else:
-                # 后续轮次，带着问题进行深化分析
-                print(f"教育分析师正带着问题进行深化研究: {state['critique_and_questions']}")
-                state["education_report"] = self.education_analyst.run(
-                    major, questions=state["critique_and_questions"]
-                )
+                # 后续轮次，基于批判问题优化现有报告
+                print(f"第 {round_num} 轮：基于分类批判问题优化分析报告")
+                
+                # 教育分析师使用教育相关问题进行优化
+                if state["education_questions"]:
+                    print(f"教育分析师正基于 {len(state['education_questions'])} 个教育专项问题优化报告")
+                    state["education_report"] = self.education_analyst.run(
+                        major, 
+                        questions=state["education_questions"],
+                        previous_report=state["education_report"]
+                    )
+                else:
+                    print("无教育专项问题，教育分析师保持当前报告")
+                
+                # 行业分析师使用行业相关问题进行优化
+                if state["industry_questions"]:
+                    print(f"行业分析师正基于 {len(state['industry_questions'])} 个行业专项问题优化报告")
+                    state["industry_report"] = self.industry_analyst.run(
+                        job_title, 
+                        questions=state["industry_questions"],
+                        previous_report=state["industry_report"]
+                    )
+                else:
+                    print("无行业专项问题，行业分析师保持当前报告")
             
             self._log_discussion(state, "EducationAnalyst", state["education_report"])
-            if round_num == 1: # 只在第一轮记录行业报告，因为它不变
-                self._log_discussion(state, "IndustryAnalyst", state["industry_report"])
+            self._log_discussion(state, "IndustryAnalyst", state["industry_report"])
 
             # 3. 自由辩论 (调用批判者提出问题)
             critique_result = self.critic_analyst.run_critique(
@@ -87,18 +110,28 @@ class ProjectCoordinator:
                 state["industry_report"]
             )
             self._log_discussion(state, "CriticAnalyst", critique_result)
-            state["critique_and_questions"] = critique_result.get("questions_for_next_round", [])
+            
+            # 提取分类的问题
+            state["education_questions"] = critique_result.get("education_questions", [])
+            state["industry_questions"] = critique_result.get("industry_questions", [])
+            state["critique_and_questions"] = critique_result.get("questions_for_next_round", [])  # 保持向后兼容
 
             # 4. 判断是否达成共识
-            if not state["critique_and_questions"]:
-                print("批判者未提出进一步问题，会议达成共识。")
-                self._log_discussion(state, "Coordinator", "无更多问题，达成共识。")
-                state["is_consensus_reached"] = True
-                break # 提前结束循环
+            has_education_questions = bool(state["education_questions"])
+            has_industry_questions = bool(state["industry_questions"])
             
-            # 如果未达成共识，准备下一轮的问题
-            print(f"批判者提出问题，准备进入下一轮讨论: {state['critique_and_questions']}")
-            self._log_discussion(state, "Coordinator", f"发现问题: {state['critique_and_questions']}。准备下一轮讨论。")
+            if not has_education_questions and not has_industry_questions:
+                print("批判者未提出进一步问题，会议达成共识。")
+                self._log_discussion(state, "Coordinator", "无更多分类问题，达成共识。")
+                state["is_consensus_reached"] = True
+                break
+            
+            # 准备下一轮的分类问题
+            education_count = len(state["education_questions"])
+            industry_count = len(state["industry_questions"])
+            print(f"批判者提出分类问题 - 教育: {education_count}个, 行业: {industry_count}个")
+            self._log_discussion(state, "Coordinator", 
+                f"发现分类问题 - 教育: {education_count}个, 行业: {industry_count}个。准备下一轮讨论。")
 
         if not state["is_consensus_reached"]:
             print("\n会议达到最大轮次，结束讨论。")

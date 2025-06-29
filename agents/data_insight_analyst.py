@@ -13,7 +13,7 @@ class DataInsightAnalyst:
     def run_critique(self, education_report: dict, industry_report: dict) -> Dict[str, Any]:
         """
         以"批判者"的身份，对教育和行业分析师的报告提出质疑和问题。
-        注意：这个方法是为了适配新的"虚拟圆桌会议"范式。
+        新版本：生成分类问题，分别针对教育和行业进行定向质疑
         """
         major_name = education_report.get("major_name", "N/A")
         job_title = industry_report.get("job_title", "N/A")
@@ -24,47 +24,71 @@ class DataInsightAnalyst:
         
         # 如果上游数据不完整，无法进行有意义的批判
         if not education_skills or not industry_skills:
-            return { "critique_summary": "上游报告信息不足，无法进行有效批判。", "questions_for_next_round": [] }
+            return { 
+                "critique_summary": "上游报告信息不足，无法进行有效批判。", 
+                "education_questions": [],
+                "industry_questions": [],
+                "questions_for_next_round": []  # 保持向后兼容
+            }
 
         try:
             system_prompt = """
-            You are a sharp, critical, and detail-oriented data scientist. Your role is not to find agreements, but to challenge assumptions and identify weaknesses in the analysis provided by an education expert and an industry expert.
+            You are a sharp, critical, and detail-oriented data scientist. Your role is to challenge assumptions and identify weaknesses in analysis provided by education and industry experts.
 
             You are given two analysis reports: one on a university major (`education_report`) and one on a job role (`industry_report`). Your task is to:
             
-            1.  **Identify Discrepancies and Gaps**: Scrutinize both skill lists. Where are the mismatches? What crucial industry skills are completely missing from the education side?
+            1. **Identify Discrepancies and Gaps**: Scrutinize both skill lists for mismatches and gaps.
             
-            2.  **Challenge Vague Terms**: If the education report lists a generic skill like "programming", but the industry demands specific languages like "Python" and "Go", you must point this out.
+            2. **Generate Targeted Questions**: Create specific questions for each expert:
+               - **Education Questions**: Focus on curriculum, course depth, practical training, skill development
+               - **Industry Questions**: Focus on market trends, salary ranges, career paths, emerging requirements
             
-            3.  **Question Both Sides**: Don't just focus on education shortcomings. Also challenge:
-                - Are the industry requirements realistic or outdated?
-                - Are there emerging skills that industry hasn't recognized yet?
-                - Do market trends align with current job requirements?
-                - Are career growth paths accurately represented?
-            
-            4.  **Formulate Balanced Questions**: Generate specific, actionable questions that will help BOTH the education expert AND industry expert provide better analysis in the next round. Balance questions between:
-                - Education curriculum gaps and improvements needed
-                - Industry market trends and evolving requirements
-                - Skills alignment and practical application
+            3. **Balance the Critique**: Don't just find problems - suggest areas for improvement.
 
-            Your questions should drive both experts to provide deeper, more concrete information.
+            **CRITICAL**: You must generate separate question lists for each expert domain.
 
             Respond ONLY with a valid JSON object in the following format:
             {
-                "critique_summary": "A brief summary of the main weaknesses found in BOTH education and industry analyses.",
-                "questions_for_next_round": ["Question 1 (for education)?", "Question 2 (for industry)?", "Question 3 (for both)?"]
+                "critique_summary": "Brief summary of main gaps and issues found",
+                "education_questions": [
+                    "Specific question about curriculum depth?",
+                    "Question about practical vs theoretical balance?",
+                    "Question about specific technical skills training?"
+                ],
+                "industry_questions": [
+                    "Question about market demand trends?",
+                    "Question about salary expectations?",
+                    "Question about career progression paths?"
+                ]
             }
+            
+            **Guidelines for Questions:**
+            - Education questions should focus on: curriculum gaps, practical training, skill depth, emerging technologies in education
+            - Industry questions should focus on: market trends, compensation, career growth, industry-specific requirements
+            - Each list should have 2-4 specific, actionable questions
+            - Questions should be designed to improve the respective analysis
             """
             
             user_prompt = f"""
-            Here are the reports for your critique:
-            Education Report: {json.dumps(education_report, ensure_ascii=False)}
-            Industry Report: {json.dumps(industry_report, ensure_ascii=False)}
-            Please provide your critique and questions.
+            Here are the reports for your targeted critique:
+            
+            **Education Report Analysis:**
+            - Major: {major_name}
+            - Skills Taught: {education_skills}
+            - Core Courses: {education_report.get('core_courses', [])}
+            
+            **Industry Report Analysis:**
+            - Job Title: {job_title}
+            - Required Skills: {industry_skills}
+            - Responsibilities: {industry_report.get('responsibilities', [])}
+            - Market Trends: {industry_report.get('market_trends', [])}
+            - Career Growth: {industry_report.get('career_growth', [])}
+            
+            Please provide targeted critique with separate question lists for education and industry experts.
             """
 
-            print("--> 正在连接DeepSeek API进行批判性分析...")
-            print("--> 预计需要30-45秒，正在进行深度质疑...")
+            print("--> 正在连接DeepSeek API进行分类批判性分析...")
+            print("--> 预计需要30-45秒，正在生成定向质疑问题...")
             response = self.openai_client.chat.completions.create(
                 model="deepseek-ai/DeepSeek-R1",
                 messages=[
@@ -74,7 +98,7 @@ class DataInsightAnalyst:
                 response_format={"type": "json_object"}
             )
             
-            print("--> 正在解析批判分析结果...")
+            print("--> 正在解析分类批判分析结果...")
             # 安全的JSON解析
             response_content = response.choices[0].message.content
             print(f"--> 收到批判响应内容: {response_content[:200]}...")  # 打印前200字符用于调试
@@ -89,18 +113,30 @@ class DataInsightAnalyst:
                 # 确保必要字段存在
                 if "critique_summary" not in critique_result:
                     critique_result["critique_summary"] = "批判分析出现问题"
-                if "questions_for_next_round" not in critique_result:
-                    critique_result["questions_for_next_round"] = []
-                elif not isinstance(critique_result["questions_for_next_round"], list):
-                    critique_result["questions_for_next_round"] = []
                 
-                print("--> 批判性分析完成。")
+                if "education_questions" not in critique_result:
+                    critique_result["education_questions"] = []
+                elif not isinstance(critique_result["education_questions"], list):
+                    critique_result["education_questions"] = []
+                
+                if "industry_questions" not in critique_result:
+                    critique_result["industry_questions"] = []
+                elif not isinstance(critique_result["industry_questions"], list):
+                    critique_result["industry_questions"] = []
+                
+                # 为了保持向后兼容，合并所有问题到旧字段
+                all_questions = critique_result["education_questions"] + critique_result["industry_questions"]
+                critique_result["questions_for_next_round"] = all_questions
+                
+                print(f"--> 批判性分析完成: {len(critique_result['education_questions'])} 个教育问题, {len(critique_result['industry_questions'])} 个行业问题")
                 
             except json.JSONDecodeError as e:
                 print(f"--> 批判JSON解析失败: {e}")
                 # 返回默认结构
                 critique_result = {
                     "critique_summary": "JSON解析失败，无法进行有效批判",
+                    "education_questions": [],
+                    "industry_questions": [],
                     "questions_for_next_round": []
                 }
             
@@ -108,7 +144,14 @@ class DataInsightAnalyst:
 
         except Exception as e:
             print(f"--> 批判者在执行中出错: {e}")
-            return { "error": "Failed during critique analysis.", "details": str(e) }
+            return { 
+                "error": "Failed during critique analysis.", 
+                "details": str(e),
+                "critique_summary": "批判分析失败",
+                "education_questions": [],
+                "industry_questions": [],
+                "questions_for_next_round": []
+            }
 
     def run(self, education_report: dict, industry_report: dict) -> dict:
         """

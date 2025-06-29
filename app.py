@@ -346,6 +346,40 @@ class StableAnalysisUI:
                                 """, unsafe_allow_html=True)
                     else:
                         st.success("🎉 批判分析师未发现进一步问题，分析质量已达标！")
+                
+                # 批判分析师特殊显示
+                elif agent_name == "批判分析师":
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("### 📊 批判总结")
+                        critique_summary = analysis.get("critique_summary", "无总结信息")
+                        st.write(critique_summary)
+                    
+                    with col2:
+                        st.markdown("### 🎯 质疑统计")
+                        education_q_count = len(analysis.get("education_questions", []))
+                        industry_q_count = len(analysis.get("industry_questions", []))
+                        
+                        metrics_col1, metrics_col2 = st.columns(2)
+                        with metrics_col1:
+                            st.metric("教育专项问题", education_q_count, help="针对专业课程和技能培养的质疑")
+                        with metrics_col2:
+                            st.metric("行业专项问题", industry_q_count, help="针对岗位需求和市场趋势的质疑")
+                    
+                    # 显示分类问题详情
+                    if analysis.get("education_questions"):
+                        with st.expander("📚 教育专项质疑问题", expanded=True):
+                            for i, question in enumerate(analysis["education_questions"], 1):
+                                st.write(f"**{i}.** {question}")
+                    
+                    if analysis.get("industry_questions"):
+                        with st.expander("🏢 行业专项质疑问题", expanded=True):
+                            for i, question in enumerate(analysis["industry_questions"], 1):
+                                st.write(f"**{i}.** {question}")
+                    
+                    if not analysis.get("education_questions") and not analysis.get("industry_questions"):
+                        st.success("🎉 未发现需要进一步质疑的问题，分析质量良好！")
         except Exception as e:
             st.error(f"显示{agent_name}结果时出错: {str(e)}")
 
@@ -361,26 +395,38 @@ def initialize_coordinator():
     return True
 
 def should_continue_analysis(critique_result: Dict[str, Any], round_num: int, max_rounds: int) -> bool:
-    """智能判断是否应该继续分析"""
-    questions = critique_result.get("questions_for_next_round", [])
+    """智能判断是否应该继续分析（适配分类问题模式）"""
+    # 获取分类问题
+    education_questions = critique_result.get("education_questions", [])
+    industry_questions = critique_result.get("industry_questions", [])
+    all_questions = critique_result.get("questions_for_next_round", [])
     
-    # 没有问题，达成共识
-    if not questions:
+    # 没有任何问题，达成共识
+    if not education_questions and not industry_questions:
         return False
     
     # 达到最大轮数
     if round_num >= max_rounds:
         return False
     
-    # 问题数量过多，可能陷入无限循环
-    if len(questions) > 5:
-        st.warning(f"⚠️ 批判者提出了 {len(questions)} 个问题，为避免过度分析，将在下一轮后结束")
+    # 检查每个类别的问题数量（分别判断，避免总数过多的误判）
+    education_count = len(education_questions)
+    industry_count = len(industry_questions)
+    
+    # 单个类别问题过多才警告（而不是总数）
+    if education_count > 6 or industry_count > 6:
+        st.warning(f"⚠️ 单个领域问题过多（教育: {education_count}个, 行业: {industry_count}个），为避免过度分析，将在下一轮后结束")
         return round_num < max_rounds - 1
     
     # 检查问题质量（避免重复或无意义问题）
     critique_summary = critique_result.get("critique_summary", "")
-    if len(critique_summary) < 50:  # 批判总结过短，可能质量不高
-        st.info("ℹ️ 批判质量检测：问题较为表面化，将进行最后一轮深化分析")
+    if len(critique_summary) < 30:  # 降低阈值，批判总结过短可能是因为问题很精准
+        st.info("ℹ️ 批判质量检测：问题较为精准，将继续深化分析")
+    
+    # 总问题数量合理性检查（放宽限制）
+    total_questions = education_count + industry_count
+    if total_questions > 10:  # 从5提高到10
+        st.warning(f"⚠️ 问题总数较多（{total_questions}个），将限制下一轮为最后一轮")
         return round_num < max_rounds - 1
     
     return True
@@ -388,14 +434,15 @@ def should_continue_analysis(critique_result: Dict[str, Any], round_num: int, ma
 def run_stable_analysis(coordinator, major: str, job_title: str, max_rounds: int, ui: StableAnalysisUI):
     """稳定运行分析流程"""
     try:
-        # 初始化状态
+        # 初始化分析状态
         state = {
             "topic": f"专业[{major}] vs 岗位[{job_title}]",
-            "discussion_log": [],
             "education_report": {},
             "industry_report": {},
             "data_insight_report": {},
-            "critique_and_questions": [],
+            "critique_and_questions": [],  # 保持向后兼容
+            "education_questions": [],     # 新增：教育专项问题
+            "industry_questions": [],      # 新增：行业专项问题
             "is_consensus_reached": False
         }
         
@@ -438,39 +485,56 @@ def run_stable_analysis(coordinator, major: str, job_title: str, max_rounds: int
                 ui.display_agent_analysis("行业分析师", state["industry_report"])
             else:
                 # 后续轮次：深化分析
-                question_count = len(state['critique_and_questions'])
-                ui.display_status(f"📚 教育分析师和行业分析师正在基于 {question_count} 个问题进行深化研究...")
+                education_question_count = len(state.get('education_questions', []))
+                industry_question_count = len(state.get('industry_questions', []))
+                ui.display_status(f"🔄 进入定向优化模式：教育问题 {education_question_count} 个，行业问题 {industry_question_count} 个")
                 
-                # 限制问题数量，避免过度复杂化
-                limited_questions = state['critique_and_questions'][:3]  # 最多处理3个问题
-                
-                # 教育分析师深化分析
-                education_result, error = safe_execute_with_timeout(
-                    coordinator.education_analyst.run, 90, major, questions=limited_questions  # 增加到90秒
-                )
-                if error:
-                    ui.display_status(f"教育分析失败: {error}", "error")
-                    break
-                state["education_report"] = education_result
-                ui.display_agent_analysis("教育分析师", state["education_report"])
-                
-                # 行业分析师也进行深化分析
-                ui.display_status("🏢 行业分析师正在基于批判问题深化岗位分析...")
-                industry_result, error = safe_execute_with_timeout(
-                    coordinator.industry_analyst.run, 90, job_title, questions=limited_questions  # 增加到90秒
-                )
-                if error:
-                    ui.display_status(f"行业深化分析失败: {error}", "error")
-                    # 如果行业分析失败，继续使用之前的结果
-                    ui.display_status("使用之前的行业分析结果继续", "warning")
+                # 教育分析师定向优化
+                if state.get('education_questions'):
+                    limited_education_questions = state['education_questions'][:3]  # 最多处理3个问题
+                    ui.display_status(f"📚 教育分析师正在基于 {len(limited_education_questions)} 个教育专项问题优化...（预计需要60-90秒）")
+                    education_result, error = safe_execute_with_timeout(
+                        coordinator.education_analyst.run, 120, major,  # 优化模式增加到120秒
+                        questions=limited_education_questions,
+                        previous_report=state["education_report"]
+                    )
+                    if error:
+                        ui.display_status(f"教育分析优化失败: {error}", "error")
+                        if "超时" in str(error):
+                            ui.display_status("🔄 教育分析优化超时，将使用现有报告继续分析", "warning")  
+                            # 不break，继续使用之前的报告
+                        else:
+                            break
+                    state["education_report"] = education_result
+                    ui.display_agent_analysis("教育分析师", state["education_report"])
                 else:
-                    state["industry_report"] = industry_result
-                    ui.display_agent_analysis("行业分析师", state["industry_report"])
+                    ui.display_status("📚 教育分析师：无专项问题，保持当前分析结果", "info")
+                
+                # 行业分析师定向优化
+                if state.get('industry_questions'):
+                    limited_industry_questions = state['industry_questions'][:3]  # 最多处理3个问题
+                    ui.display_status(f"🏢 行业分析师正在基于 {len(limited_industry_questions)} 个行业专项问题优化...（预计需要60-90秒）")
+                    industry_result, error = safe_execute_with_timeout(
+                        coordinator.industry_analyst.run, 120, job_title,  # 优化模式增加到120秒
+                        questions=limited_industry_questions,
+                        previous_report=state["industry_report"]
+                    )
+                    if error:
+                        ui.display_status(f"行业分析优化失败: {error}", "error")
+                        if "超时" in str(error):
+                            ui.display_status("🔄 行业分析优化超时，将使用现有报告继续分析", "warning")
+                        else:
+                            ui.display_status("使用之前的行业分析结果继续", "warning")
+                    else:
+                        state["industry_report"] = industry_result
+                        ui.display_agent_analysis("行业分析师", state["industry_report"])
+                else:
+                    ui.display_status("🏢 行业分析师：无专项问题，保持当前分析结果", "info")
             
             # 批判分析
             ui.display_status("🤔 批判分析师正在进行质疑和审查...")
             critique_result, error = safe_execute_with_timeout(
-                coordinator.critic_analyst.run_critique, 60,  # 增加到60秒
+                coordinator.critic_analyst.run_critique, 90,  # 从60秒增加到90秒
                 state["education_report"],
                 state["industry_report"]
             )
@@ -484,22 +548,29 @@ def run_stable_analysis(coordinator, major: str, job_title: str, max_rounds: int
                 "questions": len(critique_result.get("questions_for_next_round", []))
             })
             
+            # 提取分类问题并更新状态
+            state["education_questions"] = critique_result.get("education_questions", [])
+            state["industry_questions"] = critique_result.get("industry_questions", [])
             state["critique_and_questions"] = critique_result.get("questions_for_next_round", [])
             ui.display_agent_analysis("批判分析师", critique_result)
             
-            # 智能判断是否继续
-            if not should_continue_analysis(critique_result, round_num, effective_max_rounds):
-                if not state["critique_and_questions"]:
-                    ui.display_status(f"🎉 第 {round_num} 轮达成共识！批判分析师未发现进一步问题。", "success")
-                else:
-                    ui.display_status(f"📋 第 {round_num} 轮完成，基于分析质量评估，将结束讨论", "info")
+            # 智能判断是否继续（基于分类问题）
+            has_education_questions = bool(state["education_questions"])
+            has_industry_questions = bool(state["industry_questions"])
+            
+            if not has_education_questions and not has_industry_questions:
+                ui.display_status(f"🎉 第 {round_num} 轮达成共识！批判分析师未发现进一步问题。", "success")
+                state["is_consensus_reached"] = True
+                break
+            elif not should_continue_analysis(critique_result, round_num, effective_max_rounds):
+                ui.display_status(f"📋 第 {round_num} 轮完成，基于分析质量评估，将结束讨论", "info")
                 state["is_consensus_reached"] = True
                 break
         
         # 最终量化分析
         ui.display_status("📊 正在进行最终量化匹配分析...")
         final_analysis, error = safe_execute_with_timeout(
-            coordinator.critic_analyst.run, 90,  # 增加到90秒，因为涉及复杂的技能匹配分析
+            coordinator.critic_analyst.run, 120,  # 从90秒增加到120秒，因为涉及复杂的技能匹配分析
             state["education_report"], 
             state["industry_report"]
         )
@@ -529,6 +600,12 @@ def main():
         - 🎯 核心技能差距识别  
         - 💡 职业发展建议
         - 📈 实时分析过程展示
+        
+        **✨ 智能定向质疑模式：**
+        - 第一轮进行全面基础分析
+        - 批判分析师生成分类问题，分别针对教育和行业
+        - 教育分析师只处理教育相关问题，行业分析师只处理行业相关问题  
+        - 避免无效质疑，提高分析精准度和效率
         """)
     
     # 侧边栏配置
@@ -553,9 +630,34 @@ def main():
         专业报告撰写专家
         """)
         
+        st.subheader("🔄 分析模式")
+        st.info("""
+        **第一轮：基础分析**  
+        全新搜索和分析专业与岗位
+        
+        **后续轮次：定向优化模式**  
+        批判分析师生成分类问题：
+        - 📚 教育专项问题 → 教育分析师
+        - 🏢 行业专项问题 → 行业分析师
+        - 🎯 精准优化，避免无关质疑
+        """)
+        
         st.subheader("🔧 分析参数")
         max_rounds = st.slider("期望讨论轮数", 2, 5, 3, help="实际轮数可能根据分析质量智能调整")
         show_detailed_log = st.checkbox("显示详细日志", value=False)
+        
+        st.info("""
+        **⏱️ 超时设置：**
+        - 基础分析：90秒/轮
+        - 优化分析：120秒/轮  
+        - 批判分析：90秒/轮
+        - 最终分析：120秒/轮
+        
+        **🛡️ 智能保护：**
+        - 单个领域问题超过6个将限制轮数
+        - 总问题数超过10个将提前结束
+        - 超时自动使用现有结果继续
+        """)
         
         # 显示当前状态
         if st.session_state.analysis_state != 'idle':
